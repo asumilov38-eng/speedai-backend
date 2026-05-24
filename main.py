@@ -1,4 +1,4 @@
-# main.py — YandexGPT (Чистый код, ключи только в Render)
+# main.py — YandexGPT (Финальная версия)
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import requests, json, os
@@ -14,11 +14,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 🔑 Читаем переменные (НЕ ломаем запуск, если их нет)
+# 🔑 Ключи из переменных Render
 YC_API_KEY = os.getenv("YC_API_KEY", "")
 YC_FOLDER_ID = os.getenv("YC_FOLDER_ID", "")
 
-MY_CONTACT = "Telegram: @FBK_MiniBusiness | Номер телефона: +7 904 958 42 82"
+# 📞 Обновлённый контакт
+MY_CONTACT = "Telegram: @FBK_MiniBusiness | Телефон: +7 904 958 42 82"
 
 SYSTEM_PROMPT = f"""Ты ассистент компании SpeedAI. Основатель: Андрей.
 Задача: отвечать об услугах (автоматизация, ИИ-боты, таблицы), выявлять потребность, вести к решению.
@@ -27,6 +28,7 @@ SYSTEM_PROMPT = f"""Ты ассистент компании SpeedAI. Основ
 2. Не называй цену сразу → спроси: "Какую задачу хотите решить?".
 3. При завершении диалога выведи СТРОГО JSON: {{"handoff": true, "message": "Готов передать контакт."}}
 4. Не выдумывай факты. Если не знаешь → предложи связаться с Андреем.
+5. В конце говори: "Напишите в Telegram @FBK_MiniBusiness или позвоните по номеру +7 904 958 42 82".
 Контакт: {MY_CONTACT}
 """
 
@@ -34,7 +36,7 @@ YANDEX_URL = "https://llm.api.cloud.yandex.net/foundationModels/v1/completion"
 
 @app.post("/chat")
 async def chat(req: dict):
-    # 🔍 ПРОВЕРКА КЛЮЧЕЙ ПРЯМО ЗДЕСЬ (чтобы не блокировать запуск сервера)
+    # Проверка ключей (внутри эндпоинта, чтобы не ломать запуск)
     if not YC_API_KEY or not YC_FOLDER_ID:
         raise HTTPException(500, "⚙️ Сервер работает, но ключи Yandex не найдены. Проверь переменные в Render.")
 
@@ -59,7 +61,7 @@ async def chat(req: dict):
         }
         headers = {
             "Content-Type": "application/json",
-            "Authorization": f"Api-Key {YC_API_KEY}"  # 🔥 Api-Key, не Bearer!
+            "Authorization": f"Api-Key {YC_API_KEY}"
         }
         
         print(f"🌐 Sending to YandexGPT...")
@@ -80,17 +82,14 @@ async def chat(req: dict):
         if not text:
             raise HTTPException(500, "Нет текста в ответе ИИ")
         
-                # 🔍 Парсим handoff (ищем JSON в КОНЦЕ ответа)
+        # 🔍 Парсим handoff (ищем JSON в КОНЦЕ ответа) — ОТСТУПЫ ИСПРАВЛЕНЫ!
         try:
-            # Ищем последнюю открывающую скобку
             last_brace = text.rfind('{')
             if last_brace != -1:
-                # Пробуем распарсить всё от этой скобки до конца
                 potential_json = text[last_brace:].strip()
                 parsed = json.loads(potential_json)
                 
                 if parsed.get("handoff"):
-                    # Возвращаем чистый текст (без JSON) + сигнал хэндоффа
                     clean_text = text[:last_brace].strip()
                     return {
                         "text": clean_text if clean_text else parsed.get("message", "Готов передать контакт."),
@@ -98,10 +97,8 @@ async def chat(req: dict):
                         "contacts": f"✅ {MY_CONTACT}"
                     }
         except Exception as e:
-            print(f"⚠️ Handoff parse: {e}")  # Для отладки
-            pass  # Если не вышло — просто показываем текст как есть
-            
-        return {"text": text, "handoff": False}
+            print(f"⚠️ Handoff parse: {e}")
+            pass
             
         return {"text": text, "handoff": False}
         
