@@ -1,7 +1,7 @@
-# main.py — YandexGPT (Финальная версия)
+# main.py — YandexGPT (Максимально просто, только текст)
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-import requests, json, os
+import requests, os
 
 app = FastAPI()
 
@@ -18,7 +18,7 @@ app.add_middleware(
 YC_API_KEY = os.getenv("YC_API_KEY", "")
 YC_FOLDER_ID = os.getenv("YC_FOLDER_ID", "")
 
-# 📞 Обновлённый контакт
+# 📞 Контакт (просто текст)
 MY_CONTACT = "Telegram: @FBK_MiniBusiness | Телефон: +7 904 958 42 82"
 
 SYSTEM_PROMPT = f"""Ты ассистент компании SpeedAI. Основатель: Андрей.
@@ -26,19 +26,17 @@ SYSTEM_PROMPT = f"""Ты ассистент компании SpeedAI. Основ
 Правила:
 1. Кратко, по-деловому, без воды.
 2. Не называй цену сразу → спроси: "Какую задачу хотите решить?".
-3. При завершении диалога выведи СТРОГО JSON: {{"handoff": true, "message": "Готов передать контакт."}}
+3. Если пользователь готов к контакту — в конце ответа просто напиши: "Напишите в Telegram @FBK_MiniBusiness или позвоните по номеру +7 904 958 42 82 — Андрей ответит лично."
 4. Не выдумывай факты. Если не знаешь → предложи связаться с Андреем.
-5. В конце говори: "Напишите в Telegram @FBK_MiniBusiness или позвоните по номеру +7 904 958 42 82".
-Контакт: {MY_CONTACT}
+5. Пиши ОТВЕТЫ ОБЫЧНЫМ ТЕКСТОМ. Никакого JSON, кода, кавычек или специальных символов.
 """
 
 YANDEX_URL = "https://llm.api.cloud.yandex.net/foundationModels/v1/completion"
 
 @app.post("/chat")
 async def chat(req: dict):
-    # Проверка ключей (внутри эндпоинта, чтобы не ломать запуск)
     if not YC_API_KEY or not YC_FOLDER_ID:
-        raise HTTPException(500, "⚙️ Сервер работает, но ключи Yandex не найдены. Проверь переменные в Render.")
+        raise HTTPException(500, "⚙️ Сервер работает, но ключи Yandex не найдены.")
 
     try:
         messages = req.get("messages", [])
@@ -64,41 +62,15 @@ async def chat(req: dict):
             "Authorization": f"Api-Key {YC_API_KEY}"
         }
         
-        print(f"🌐 Sending to YandexGPT...")
         r = requests.post(YANDEX_URL, json=payload, headers=headers, timeout=30)
-        print(f"📡 YandexGPT response: {r.status_code} - {r.text[:200]}")
         
         if r.status_code != 200:
             raise HTTPException(r.status_code, f"YandexGPT error: {r.text[:100]}")
         
         data = r.json()
-        result = data.get("result", {})
-        alternatives = result.get("alternatives", [])
+        text = data["result"]["alternatives"][0]["message"]["text"]
         
-        if not alternatives:
-            raise HTTPException(500, "Пустой ответ от ИИ")
-            
-        text = alternatives[0].get("message", {}).get("text", "")
-        if not text:
-            raise HTTPException(500, "Нет текста в ответе ИИ")
-        
-               # 🔍 ПРОСТОЙ ПАРСИНГ HANDOFF (убираем {"handoff":...} из конца)
-        if text.strip().endswith('"}'):
-            # Ищем начало JSON-блока
-            json_start = text.rfind('{"handoff"')
-            if json_start != -1:
-                # Обрезаем текст до начала JSON
-                clean_text = text[:json_start].strip()
-                # Возвращаем чистый ответ + сигнал для виджета
-                return {
-                    "text": clean_text,
-                    "handoff": True,
-                    "contacts": f"✅ {MY_CONTACT}"
-                }
-        
-        # Если handoff не нашли — возвращаем как есть
-        return {"text": text, "handoff": False}
-            
+        # 🔥 Просто возвращаем текст — ВСЕГДА
         return {"text": text, "handoff": False}
         
     except requests.exceptions.Timeout:
