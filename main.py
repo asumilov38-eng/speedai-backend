@@ -1,11 +1,11 @@
-# main.py — YandexGPT версия (API-Key)
+# main.py — YandexGPT версия (ВРЕМЕННО: ключи в коде для теста)
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import requests, json, os
 
 app = FastAPI()
 
-# 🔥 CORS: разрешаем запросы с твоего сайта
+# 🔥 CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["https://speedai-site.web.app", "http://localhost:8000", "*"],
@@ -14,14 +14,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 🔑 Яндекс.Облако данные (из переменных окружения)
-YC_API_KEY = os.getenv("YC_API_KEY", "")  # ← API-ключ (начинается на AQVN...)
-YC_FOLDER_ID = os.getenv(" folder ID", "")  # ← Folder ID (начинается на b1g...)
+# 🔑 ВРЕМЕННО: ключи прямо в коде (ПОТОМ УБЕРЁМ!)
+# Замени на свои реальные значения:
+YC_API_KEY = "AQVN1a2b3c4d5e6f7g8h9i0j..."  # ← ТВОЙ API-ключ (начинается на AQVN)
+YC_FOLDER_ID = "b1g7dlq2j50fbqjm47nd"       # ← ТВОЙ Folder ID (начинается на b1g)
 
-if not YC_API_KEY or not YC_FOLDER_ID:
-    raise RuntimeError("❌ YC_API_KEY или YC_FOLDER_ID не заданы в переменных окружения Render")
-
-MY_CONTACT = "Telegram: https://t.me/FBK_MiniBusiness | VK: https://vk.ru/depnefef2323"
+MY_CONTACT = "Telegram: @shumilov_andrey | WhatsApp: +79990000000"
 
 SYSTEM_PROMPT = f"""Ты ассистент компании SpeedAI. Основатель: Андрей.
 Задача: отвечать об услугах (автоматизация, ИИ-боты, таблицы), выявлять потребность, вести к решению.
@@ -33,7 +31,6 @@ SYSTEM_PROMPT = f"""Ты ассистент компании SpeedAI. Основ
 Контакт: {MY_CONTACT}
 """
 
-# 🔗 Эндпоинт YandexGPT
 YANDEX_URL = "https://llm.api.cloud.yandex.net/foundationModels/v1/completion"
 
 @app.post("/chat")
@@ -41,14 +38,13 @@ async def chat(req: dict):
     try:
         messages = req.get("messages", [])
         
-        # Формируем промпт для YandexGPT (он любит простой текст)
+        # Формируем промпт
         full_text = SYSTEM_PROMPT + "\n\nДиалог:\n"
         for msg in messages:
             role = "Пользователь" if msg["role"] == "user" else "Ассистент"
             full_text += f"{role}: {msg['content']}\n"
         full_text += "Ассистент:"
         
-        # Запрос к YandexGPT
         payload = {
             "modelUri": f"gpt://{YC_FOLDER_ID}/yandexgpt/latest",
             "completionOptions": {
@@ -60,23 +56,15 @@ async def chat(req: dict):
         }
         headers = {
             "Content-Type": "application/json",
-            # 🔥 ВАЖНО: для API-ключа префикс "Api-Key", а не "Bearer"
-            "Authorization": f"Api-Key {YC_API_KEY}"
+            "Authorization": f"Api-Key {YC_API_KEY}"  # 🔥 Api-Key, а не Bearer!
         }
         
         print(f"🌐 Sending to YandexGPT...")
         r = requests.post(YANDEX_URL, json=payload, headers=headers, timeout=30)
-        
         print(f"📡 YandexGPT response: {r.status_code} - {r.text[:200]}")
         
         if r.status_code != 200:
-            if r.status_code == 401:
-                print("❌ 401: Неверный API-ключ!")
-            elif r.status_code == 403:
-                print("❌ 403: Нет прав у сервисного аккаунта!")
-            elif r.status_code == 400:
-                print(f"❌ 400: Ошибка запроса: {r.text[:100]}")
-            raise HTTPException(r.status_code, f"Ошибка YandexGPT: {r.text[:100]}")
+            raise HTTPException(r.status_code, f"YandexGPT error: {r.text[:100]}")
         
         data = r.json()
         text = data["result"]["alternatives"][0]["message"]["text"]
@@ -87,19 +75,14 @@ async def chat(req: dict):
                 parsed = json.loads(text.strip())
                 if parsed.get("handoff"):
                     return {"text": parsed["message"], "handoff": True, "contacts": f"✅ {MY_CONTACT}"}
-        except Exception as e:
-            print(f"⚠️ Handoff parse error: {e}")
+        except:
             pass
             
         return {"text": text, "handoff": False}
         
-    except requests.exceptions.Timeout:
-        raise HTTPException(504, "Таймаут: ИИ долго думает. Попробуйте ещё раз.")
     except Exception as e:
-        print(f"❌ CRITICAL ERROR: {type(e).__name__}: {e}")
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(500, f"Внутренняя ошибка: {str(e)[:100]}")
+        print(f"❌ Error: {type(e).__name__}: {e}")
+        raise HTTPException(500, f"Error: {str(e)[:100]}")
 
 @app.get("/")
 def root():
