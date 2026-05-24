@@ -40,7 +40,7 @@ async def chat(req: dict):
         messages = req.get("messages", [])
         
         payload = {
-            "model": "google/gemma-2-9b-it:free",
+            "model": "meta-llama/llama-3.1-8b-instruct:free",
             "messages": [{"role": "system", "content": SYSTEM_PROMPT}] + messages,
             "temperature": 0.3,
             "max_tokens": 800
