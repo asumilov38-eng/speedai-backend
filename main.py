@@ -1,4 +1,4 @@
-# main.py — YandexGPT версия (ВРЕМЕННО: ключи в коде для теста)
+# main.py — YandexGPT (Чистый код, ключи только в Render)
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import requests, json, os
@@ -14,10 +14,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 🔑 ВРЕМЕННО: ключи прямо в коде (ПОТОМ УБЕРЁМ!)
-# Замени на свои реальные значения:
-YC_API_KEY = "AQVN1a2b3c4d5e6f7g8h9i0j..."  # ← ТВОЙ API-ключ (начинается на AQVN)
-YC_FOLDER_ID = "b1g7dlq2j50fbqjm47nd"       # ← ТВОЙ Folder ID (начинается на b1g)
+# 🔑 Читаем переменные (НЕ ломаем запуск, если их нет)
+YC_API_KEY = os.getenv("YC_API_KEY", "")
+YC_FOLDER_ID = os.getenv("YC_FOLDER_ID", "")
 
 MY_CONTACT = "Telegram: @shumilov_andrey | WhatsApp: +79990000000"
 
@@ -35,6 +34,10 @@ YANDEX_URL = "https://llm.api.cloud.yandex.net/foundationModels/v1/completion"
 
 @app.post("/chat")
 async def chat(req: dict):
+    # 🔍 ПРОВЕРКА КЛЮЧЕЙ ПРЯМО ЗДЕСЬ (чтобы не блокировать запуск сервера)
+    if not YC_API_KEY or not YC_FOLDER_ID:
+        raise HTTPException(500, "⚙️ Сервер работает, но ключи Yandex не найдены. Проверь переменные в Render.")
+
     try:
         messages = req.get("messages", [])
         
@@ -56,7 +59,7 @@ async def chat(req: dict):
         }
         headers = {
             "Content-Type": "application/json",
-            "Authorization": f"Api-Key {YC_API_KEY}"  # 🔥 Api-Key, а не Bearer!
+            "Authorization": f"Api-Key {YC_API_KEY}"  # 🔥 Api-Key, не Bearer!
         }
         
         print(f"🌐 Sending to YandexGPT...")
@@ -67,7 +70,15 @@ async def chat(req: dict):
             raise HTTPException(r.status_code, f"YandexGPT error: {r.text[:100]}")
         
         data = r.json()
-        text = data["result"]["alternatives"][0]["message"]["text"]
+        result = data.get("result", {})
+        alternatives = result.get("alternatives", [])
+        
+        if not alternatives:
+            raise HTTPException(500, "Пустой ответ от ИИ")
+            
+        text = alternatives[0].get("message", {}).get("text", "")
+        if not text:
+            raise HTTPException(500, "Нет текста в ответе ИИ")
         
         # Парсим handoff
         try:
@@ -80,8 +91,10 @@ async def chat(req: dict):
             
         return {"text": text, "handoff": False}
         
+    except requests.exceptions.Timeout:
+        raise HTTPException(504, "Таймаут: ИИ долго думает.")
     except Exception as e:
-        print(f"❌ Error: {type(e).__name__}: {e}")
+        print(f"❌ Error: {e}")
         raise HTTPException(500, f"Error: {str(e)[:100]}")
 
 @app.get("/")
