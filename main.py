@@ -34,6 +34,9 @@ SYSTEM_PROMPT = f"""Ты ассистент компании SpeedAI. Основ
 @app.post("/chat")
 async def chat(req: dict):
     try:
+        print(f"🔑 API_KEY starts with: {API_KEY[:10] if API_KEY else 'EMPTY'}...")  # Лог ключа
+        print(f"📦 Request: {req.get('messages', [])[-1].get('content', '')[:50]}...")  # Лог запроса
+        
         messages = req.get("messages", [])
         
         payload = {
@@ -49,6 +52,7 @@ async def chat(req: dict):
             "X-Title": "SpeedAI Chat"
         }
         
+        print(f"🌐 Sending to OpenRouter...")
         r = requests.post(
             "https://openrouter.ai/api/v1/chat/completions",
             json=payload,
@@ -56,9 +60,16 @@ async def chat(req: dict):
             timeout=30
         )
         
+        print(f"📡 OpenRouter response: {r.status_code} - {r.text[:200]}")  # Лог ответа
+        
         if r.status_code != 200:
-            print(f"❌ OpenRouter error: {r.status_code} - {r.text}")
-            raise HTTPException(502, f"Ошибка ИИ: {r.status_code}")
+            if r.status_code == 401:
+                print("❌ 401: Неверный API-ключ!")
+            elif r.status_code == 429:
+                print("❌ 429: Лимит запросов исчерпан!")
+            elif r.status_code == 404:
+                print("❌ 404: Модель не найдена!")
+            raise HTTPException(r.status_code, f"OpenRouter error: {r.text[:100]}")
         
         data = r.json()
         text = data["choices"][0]["message"]["content"]
@@ -69,19 +80,17 @@ async def chat(req: dict):
                 parsed = json.loads(text.strip())
                 if parsed.get("handoff"):
                     return {"text": parsed["message"], "handoff": True, "contacts": f"✅ {MY_CONTACT}"}
-        except:
+        except Exception as e:
+            print(f"⚠️ Handoff parse error: {e}")
             pass
             
         return {"text": text, "handoff": False}
         
-    except requests.exceptions.Timeout:
-        raise HTTPException(504, "Таймаут: ИИ долго думает. Попробуйте ещё раз.")
-    except requests.exceptions.RequestException as e:
-        print(f"❌ Request error: {e}")
-        raise HTTPException(502, f"Ошибка соединения с ИИ: {str(e)}")
     except Exception as e:
-        print(f"❌ Internal error: {e}")
-        raise HTTPException(500, f"Внутренняя ошибка: {str(e)}")
+        print(f"❌ CRITICAL ERROR: {type(e).__name__}: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(500, f"Internal error: {str(e)[:100]}")
 
 @app.get("/")
 def root():
