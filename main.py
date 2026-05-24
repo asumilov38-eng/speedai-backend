@@ -80,14 +80,26 @@ async def chat(req: dict):
         if not text:
             raise HTTPException(500, "Нет текста в ответе ИИ")
         
-        # Парсим handoff
+        # 🔍 Парсим handoff (ищем JSON в КОНЦЕ ответа)
         try:
-            if text.strip().startswith("{"):
-                parsed = json.loads(text.strip())
-                if parsed.get("handoff"):
-                    return {"text": parsed["message"], "handoff": True, "contacts": f"✅ {MY_CONTACT}"}
-        except:
-            pass
+            # Ищем последнюю открывающую скобку
+         last_brace = text.rfind('{')
+            if last_brace != -1:
+             # Пробуем распарсить всё от этой скобки до конца
+                potential_json = text[last_brace:].strip()
+                parsed = json.loads(potential_json)
+        
+        if parsed.get("handoff"):
+            # Возвращаем чистый текст (без JSON) + сигнал хэндоффа
+            clean_text = text[:last_brace].strip()
+            return {
+                "text": clean_text if clean_text else parsed.get("message", "Готов передать контакт."),
+                "handoff": True,
+                "contacts": f"✅ {MY_CONTACT}"
+            }
+except Exception as e:
+    print(f"⚠️ Handoff parse: {e}")  # Для отладки
+    pass  # Если не вышло — просто показываем текст как есть
             
         return {"text": text, "handoff": False}
         
