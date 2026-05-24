@@ -82,23 +82,22 @@ async def chat(req: dict):
         if not text:
             raise HTTPException(500, "Нет текста в ответе ИИ")
         
-        # 🔍 Парсим handoff (ищем JSON в КОНЦЕ ответа) — ОТСТУПЫ ИСПРАВЛЕНЫ!
-        try:
-            last_brace = text.rfind('{')
-            if last_brace != -1:
-                potential_json = text[last_brace:].strip()
-                parsed = json.loads(potential_json)
-                
-                if parsed.get("handoff"):
-                    clean_text = text[:last_brace].strip()
-                    return {
-                        "text": clean_text if clean_text else parsed.get("message", "Готов передать контакт."),
-                        "handoff": True,
-                        "contacts": f"✅ {MY_CONTACT}"
-                    }
-        except Exception as e:
-            print(f"⚠️ Handoff parse: {e}")
-            pass
+               # 🔍 ПРОСТОЙ ПАРСИНГ HANDOFF (убираем {"handoff":...} из конца)
+        if text.strip().endswith('"}'):
+            # Ищем начало JSON-блока
+            json_start = text.rfind('{"handoff"')
+            if json_start != -1:
+                # Обрезаем текст до начала JSON
+                clean_text = text[:json_start].strip()
+                # Возвращаем чистый ответ + сигнал для виджета
+                return {
+                    "text": clean_text,
+                    "handoff": True,
+                    "contacts": f"✅ {MY_CONTACT}"
+                }
+        
+        # Если handoff не нашли — возвращаем как есть
+        return {"text": text, "handoff": False}
             
         return {"text": text, "handoff": False}
         
