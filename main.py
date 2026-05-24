@@ -40,7 +40,7 @@ async def chat(req: dict):
         messages = req.get("messages", [])
         
         payload = {
-            "model": "meta-llama/llama-3.1-8b-instruct:free",
+            "model": "deepseek/deepseek-r1:free",
             "messages": [{"role": "system", "content": SYSTEM_PROMPT}] + messages,
             "temperature": 0.3,
             "max_tokens": 800
