@@ -18,7 +18,7 @@ app.add_middleware(
 YC_API_KEY = os.getenv("YC_API_KEY", "")
 YC_FOLDER_ID = os.getenv("YC_FOLDER_ID", "")
 
-MY_CONTACT = "Telegram: @shumilov_andrey | WhatsApp: +79990000000"
+MY_CONTACT = "Telegram: @FBK_MiniBusiness | Номер телефона: +7 904 958 42 82"
 
 SYSTEM_PROMPT = f"""Ты ассистент компании SpeedAI. Основатель: Андрей.
 Задача: отвечать об услугах (автоматизация, ИИ-боты, таблицы), выявлять потребность, вести к решению.
